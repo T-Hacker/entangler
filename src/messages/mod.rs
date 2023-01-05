@@ -34,7 +34,7 @@ mod tests {
         let mut decoder = HelloMessageDecoder;
         let decoded_message = decoder.decode(&mut buffer).unwrap().unwrap();
 
-        // Assert that we down't have more bytes in the buffer.
+        // Assert that we don't have more bytes in the buffer.
         assert!(buffer.is_empty());
 
         // Assert that both message are equal.

@@ -11,6 +11,8 @@ clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = "0.6.2"
 fast_rsync = "0.1.4"
 futures = "0.3.25"
+rcgen = "0.10.0"
+rustls = { version = "0.20.7", features = ["quic"] }
 tokio = { version = "1.23.0", features = ["full"] }
 tokio-stream = "0.1.11"
 tokio-util = { version = "0.7.4", features = ["full"] }

@@ -12,6 +12,12 @@ use tracing::*;
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
 enum Command {
+    /// Generate self signed certificate.
+    GenerateCertificate {
+        cert_filename: Option<String>,
+        private_key_filename: Option<String>,
+    },
+
     /// Listen for incoming connections.
     Listen {
         /// Address to listen on.
@@ -35,10 +41,35 @@ async fn main() -> Result<()> {
 
     // Handle arguments.
     let command = Command::parse();
-    match &command {
-        Command::Listen { address } => listen(address).await?,
-        Command::Connect { address } => connect(address).await?,
+    match command {
+        Command::GenerateCertificate {
+            cert_filename,
+            private_key_filename,
+        } => generate_self_signed_cert(cert_filename, private_key_filename).await?,
+        Command::Listen { address } => listen(&address).await?,
+        Command::Connect { address } => connect(&address).await?,
     }
+
+    Ok(())
+}
+
+async fn generate_self_signed_cert(
+    cert_filename: Option<String>,
+    private_key_filename: Option<String>,
+) -> Result<()> {
+    let cert_filename = cert_filename.unwrap_or_else(|| "cert".to_string());
+    let private_key_filename = private_key_filename.unwrap_or_else(|| "private_key".to_string());
+
+    // Generate certificate and private key.
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()])?;
+    let private_key_der = cert.serialize_private_key_der();
+
+    // Save certificate.
+    let cert_der = cert.serialize_der()?;
+    tokio::fs::write(cert_filename, &cert_der).await?;
+
+    // Save private key file.
+    tokio::fs::write(private_key_filename, &private_key_der).await?;
 
     Ok(())
 }
