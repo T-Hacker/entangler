@@ -2,6 +2,12 @@
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
     "cSpell.words": [
-        "repr"
+        "pemfile",
+        "pkcs",
+        "quic",
+        "rcgen",
+        "repr",
+        "rustls",
+        "unsplit"
     ]
 }

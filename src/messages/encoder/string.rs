@@ -1,3 +1,4 @@
+use bytes::BytesMut;
 use tokio_util::codec::Encoder;
 
 pub struct StringEncoder;
@@ -5,7 +6,7 @@ pub struct StringEncoder;
 impl Encoder<&str> for StringEncoder {
     type Error = std::io::Error;
 
-    fn encode(&mut self, item: &str, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: &str, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Reserve space as an optimization.
         dst.reserve(4 + item.len());
 
