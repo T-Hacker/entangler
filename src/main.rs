@@ -15,7 +15,13 @@ use tracing::*;
 enum Command {
     /// Generate self signed certificate.
     GenerateCertificate {
+        /// Name of the server. The client must use the same name when connecting to the server.
+        server_name: String,
+
+        /// Optional path to output the certificate.
         cert_filename: Option<String>,
+
+        /// Optional path to output the certificate private key.
         private_key_filename: Option<String>,
     },
 
@@ -33,8 +39,14 @@ enum Command {
 
     /// Connect to another client.
     Connect {
+        /// Server name. Must match the name on the certificate.
+        server_name: String,
+
         /// Client address.
         address: String,
+
+        /// Connection certificate.
+        cert_filename: Option<String>,
     },
 }
 
@@ -50,9 +62,10 @@ async fn main() -> Result<()> {
     let command = Command::parse();
     match command {
         Command::GenerateCertificate {
+            server_name,
             cert_filename,
             private_key_filename,
-        } => generate_self_signed_cert(cert_filename, private_key_filename).await?,
+        } => generate_self_signed_cert(server_name, cert_filename, private_key_filename).await?,
 
         Command::Listen {
             address,
@@ -60,7 +73,11 @@ async fn main() -> Result<()> {
             private_key_filename,
         } => listen(&address, cert_filename, private_key_filename).await?,
 
-        Command::Connect { address } => connect(&address).await?,
+        Command::Connect {
+            server_name,
+            address,
+            cert_filename,
+        } => connect(&server_name, &address, cert_filename).await?,
     }
 
     Ok(())

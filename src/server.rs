@@ -1,14 +1,16 @@
 use crate::{
     certificate::{
         certificate_filename_or_default, private_key_filename_or_default, read_certs_from_file,
+        read_private_key_from_file,
     },
-    messages::decoders::HelloMessageDecoder,
+    messages::{decoders::HelloMessageDecoder, encoder::HelloMessageEncoder, HelloMessage},
+    server,
 };
 use color_eyre::eyre::{eyre, Result};
-use futures::TryStreamExt;
+use futures::{SinkExt, TryStreamExt};
 use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
 use std::net::SocketAddr;
-use tokio_util::codec::FramedRead;
+use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::*;
 
 pub async fn listen(
@@ -16,10 +18,11 @@ pub async fn listen(
     cert_filename: Option<String>,
     private_key_filename: Option<String>,
 ) -> Result<()> {
-    // Create server configuration.
+    // Create server connection configuration.
     let cert_filename = certificate_filename_or_default(cert_filename);
     let private_key_filename = private_key_filename_or_default(private_key_filename);
-    let (certs, private_key) = read_certs_from_file(cert_filename, private_key_filename)?;
+    let certs = read_certs_from_file(cert_filename)?;
+    let private_key = read_private_key_from_file(private_key_filename)?;
     let server_config = ServerConfig::with_single_cert(certs, private_key)?;
 
     // Create the endpoint to start receiving connections.
@@ -77,8 +80,13 @@ async fn handle_client(
         .await?
         .ok_or_else(|| eyre!("Didn't receive hello message from client: {remote_address}."))?;
 
-    //
-    dbg!(hello_message);
+    info!("Received hello message from client ({remote_address}): {hello_message:?}");
+
+    // Respond to the client with an hello message.
+    let mut framed = FramedWrite::new(send, HelloMessageEncoder);
+    let hello_message = HelloMessage::new(123, "server_test".to_string(), "0.0.1".to_string());
+    framed.send(&hello_message).await?;
+    framed.flush().await?;
 
     Ok(())
 }
