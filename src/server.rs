@@ -42,7 +42,7 @@ pub async fn listen(
         };
 
         // Open incoming connection.
-        let (send, recv) = match connection.open_bi().await {
+        let (send, recv) = match connection.accept_bi().await {
             Ok(ch) => ch,
             Err(e) => {
                 error!("Fail to open incoming connection: {e:?}");
