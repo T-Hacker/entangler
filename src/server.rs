@@ -52,16 +52,15 @@ pub async fn listen(
         };
 
         // Create a task to handle client requests.
-        let remote_address = connection.remote_address();
         tokio::spawn(async move {
+            let remote_address = connection.remote_address();
+
             match handle_client(remote_address, send, recv).await {
                 Ok(()) => info!("Client closed connection {}.", remote_address),
-                Err(e) => error!(
-                    "Error handling client {}: {}",
-                    connection.remote_address(),
-                    e
-                ),
+                Err(e) => error!("Error handling client {}: {}", remote_address, e),
             }
+
+            connection.closed().await;
         });
     }
 
@@ -80,13 +79,14 @@ async fn handle_client(
         .await?
         .ok_or_else(|| eyre!("Didn't receive hello message from client: {remote_address}."))?;
 
-    info!("Received hello message from client ({remote_address}): {hello_message:?}");
+    info!("Received hello message from client ({remote_address}): {hello_message:#?}");
 
     // Respond to the client with an hello message.
     let mut framed = FramedWrite::new(send, HelloMessageEncoder);
     let hello_message = HelloMessage::new(123, "server_test".to_string(), "0.0.1".to_string());
+
+    info!("Send hello message to client ({remote_address}): {hello_message:#?}");
     framed.send(&hello_message).await?;
-    framed.flush().await?;
 
     Ok(())
 }

@@ -11,8 +11,6 @@ impl Decoder for HelloMessageDecoder {
     type Error = std::io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        println!("{:?}", &src[..]);
-
         // Try to deserialize to message type.
         let mut message_type_decoder = MessageTypeDecoder;
         let message_type = match message_type_decoder.decode(src) {
@@ -21,8 +19,6 @@ impl Decoder for HelloMessageDecoder {
             Ok(None) => return Ok(None),
             Err(e) => return Err(e),
         };
-
-        println!("{:?}", &src[..]);
 
         // Check if this is a hello message.
         let MessageType::Hello = &message_type else {
@@ -45,8 +41,6 @@ impl Decoder for HelloMessageDecoder {
             u32::from_le_bytes(magic_number)
         };
 
-        println!("{:?}", &src[..]);
-
         // Try to deserialize the name.
         let mut string_decoder = StringDecoder;
         let Some(name) = string_decoder.decode(src)? else {
@@ -54,15 +48,11 @@ impl Decoder for HelloMessageDecoder {
             return Ok(None);
         };
 
-        println!("{:?}", &src[..]);
-
         // Try to deserialize the version.
         let Some(version) = string_decoder.decode(src)? else {
             // Didn't get the version.
             return Ok(None);
         };
-
-        println!("{:?}", &src[..]);
 
         // Return the object.
         Ok(Some(HelloMessage::new(magic_number, name, version)))

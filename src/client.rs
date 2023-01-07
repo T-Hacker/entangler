@@ -42,7 +42,6 @@ pub async fn connect(
     let mut framed = FramedWrite::new(send, HelloMessageEncoder);
     let hello_message = HelloMessage::new(123, "client_test".to_string(), "0.0.1".to_string());
     framed.send(&hello_message).await?;
-    framed.flush().await?;
 
     // Receive the hello message from the server.
     info!("Receiving hello message...");
@@ -52,6 +51,9 @@ pub async fn connect(
         .await?
         .ok_or_else(|| eyre!("Hello message not received."))?;
     info!("Received hello message from server: {hello_message:?}");
+
+    // Wait for server to clean up.
+    endpoint.wait_idle().await;
 
     Ok(())
 }
