@@ -17,12 +17,11 @@ pub async fn connect(
     // Create client connection configuration.
     let certificate_path = certificate_filename_or_default(certificate_path);
     let certs = read_certs_from_file(certificate_path)?;
-    let cert = certs
-        .first()
-        .ok_or_else(|| eyre!("Certificate file does not contain any certificate."))?;
 
     let mut certificate_store = RootCertStore::empty();
-    certificate_store.add(cert)?;
+    for cert in &certs {
+        certificate_store.add(cert)?;
+    }
 
     let client_config = ClientConfig::with_root_certificates(certificate_store);
 
