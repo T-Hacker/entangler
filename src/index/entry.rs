@@ -5,6 +5,7 @@ use tokio::{
     fs::File,
     io::{AsyncReadExt, BufReader},
 };
+use tracing::info;
 
 #[derive(Debug)]
 pub struct IndexEntry {
@@ -24,7 +25,22 @@ impl IndexEntry {
         }
 
         // Calculate block size.
-        let file = File::open(&file_path).await?;
+        let file = loop {
+            match File::open(&file_path).await {
+                Ok(file) => break file,
+                Err(e) => {
+                    if let Some(error_code) = e.raw_os_error() {
+                        if error_code == 24 {
+                            tokio::task::yield_now().await;
+
+                            continue;
+                        }
+                    };
+
+                    return Err(eyre!("Fail to open file: {e:?}"));
+                }
+            }
+        };
         let metadata = file.metadata().await?;
         let file_size = metadata.len();
         let block_size: u32 = if file_size < 250 * 1024 * 1024 {
@@ -50,19 +66,22 @@ impl IndexEntry {
         let mut blocks = Vec::with_capacity(num_blocks);
         let mut file_buffer = BufReader::with_capacity(block_size as usize, file);
         let mut buffer = vec![0u8; block_size as usize];
-        let mut offset = 0;
+        let mut total_bytes_to_read = file_size;
         loop {
             // Read file block.
-            let bytes_read = file_buffer.read(&mut buffer).await?;
-            if bytes_read == 0 {
+            let bytes_to_read = usize::min(block_size as usize, total_bytes_to_read as usize);
+            if bytes_to_read == 0 {
                 break;
             }
+            let bytes_read = file_buffer.read_exact(&mut buffer[..bytes_to_read]).await?;
+            info!("Path: {file_path:?} Bytes read: {bytes_read} Bytes to read: {bytes_to_read} File size: {file_size}");
 
             // Create block.
+            let offset = file_size - total_bytes_to_read;
             blocks.push(Block::new(offset, &buffer[..bytes_read]));
 
-            // Increment file offset.
-            offset += bytes_read as u64;
+            // Decrement the number of bytes to read.
+            total_bytes_to_read -= bytes_read as u64;
         }
 
         // Return index.
