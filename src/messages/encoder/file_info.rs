@@ -1,4 +1,4 @@
-use super::StringEncoder;
+use super::{BlockInfoEncoder, StringEncoder};
 use crate::index::FileInfo;
 use std::io::ErrorKind;
 use tokio_util::codec::Encoder;
@@ -10,6 +10,7 @@ impl Encoder<&FileInfo> for FileInfoEncoder {
 
     fn encode(&mut self, item: &FileInfo, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
         let mut string_encoder = StringEncoder;
+        let mut block_info_encoder = BlockInfoEncoder;
 
         // Write file path.
         let path = item.path();
@@ -18,9 +19,13 @@ impl Encoder<&FileInfo> for FileInfoEncoder {
         })?;
         string_encoder.encode(path, dst)?;
 
+        // Reserve space for all blocks for performance reasons.
+        let block_size_bytes = item.blocks().len() * item.block_size() as usize;
+        dst.reserve(block_size_bytes.saturating_sub(dst.len()));
+
         // Write file blocks.
         for block in item.blocks() {
-            todo!();
+            block_info_encoder.encode(block, dst)?;
         }
 
         Ok(())

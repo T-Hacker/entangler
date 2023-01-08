@@ -28,7 +28,7 @@ impl Decoder for HelloMessageDecoder {
         // Try to deserialize the magic number.
         if src.len() < 4 {
             // Not enough data. Lets just reserve some data for the next buffer.
-            src.reserve(4 - src.len());
+            src.reserve(4_usize.saturating_sub(src.len()));
 
             return Ok(None);
         }

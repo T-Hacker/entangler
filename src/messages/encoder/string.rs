@@ -8,7 +8,7 @@ impl Encoder<&str> for StringEncoder {
 
     fn encode(&mut self, item: &str, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Reserve space as an optimization.
-        dst.reserve(4 + item.len());
+        dst.reserve((4 + item.len()).saturating_sub(dst.len()));
 
         // Serialize string size.
         let length = item.len() as u32;

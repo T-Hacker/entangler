@@ -29,4 +29,20 @@ impl BlockInfo {
             sha3,
         }
     }
+
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
+
+    pub fn block_size(&self) -> u32 {
+        self.block_size
+    }
+
+    pub fn crc32(&self) -> u32 {
+        self.crc32
+    }
+
+    pub fn sha3(&self) -> &[u8; 32] {
+        &self.sha3
+    }
 }

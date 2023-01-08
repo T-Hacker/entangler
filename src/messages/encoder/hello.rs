@@ -14,7 +14,7 @@ impl Encoder<&HelloMessage> for HelloMessageEncoder {
         dst: &mut bytes::BytesMut,
     ) -> Result<(), Self::Error> {
         // Reserve buffer space as an optimization.
-        dst.reserve(1 + 4 + 4);
+        dst.reserve((1 + 4 + 4_usize).saturating_sub(dst.len()));
 
         // Deserialize message type.
         let message_type = *item.r#type() as u8;
