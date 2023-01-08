@@ -1,8 +1,8 @@
-mod block;
+mod block_info;
 mod builder;
-mod entry;
-mod folder;
+mod file_info;
+mod folder_index;
 
 pub use builder::IndexBuilder;
-pub use entry::IndexEntry;
-pub use folder::FolderIndex;
+pub use file_info::FileInfo;
+pub use folder_index::FolderIndex;

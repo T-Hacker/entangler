@@ -13,7 +13,7 @@ impl Encoder<&HelloMessage> for HelloMessageEncoder {
         item: &HelloMessage,
         dst: &mut bytes::BytesMut,
     ) -> Result<(), Self::Error> {
-        // Reserver buffer space as an optimization.
+        // Reserve buffer space as an optimization.
         dst.reserve(1 + 4 + 4);
 
         // Deserialize message type.

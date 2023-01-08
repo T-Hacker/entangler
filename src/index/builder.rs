@@ -1,4 +1,4 @@
-use super::{FolderIndex, IndexEntry};
+use super::{FileInfo, FolderIndex};
 use futures::{stream::FuturesUnordered, StreamExt};
 use jwalk::WalkDir;
 use std::{collections::HashMap, path::PathBuf};
@@ -40,7 +40,7 @@ impl IndexBuilder {
                 }
 
                 // Create index entry.
-                Some(IndexEntry::new(path))
+                Some(FileInfo::new(path))
             })
             .collect();
 
@@ -57,7 +57,7 @@ impl IndexBuilder {
             };
 
             let file_path = entry.path();
-            let entry = match IndexEntry::new(file_path).await {
+            let entry = match FileInfo::new(file_path).await {
                 Ok(entry) => entry,
                 Err(e) => {
                     error!("Fail to create index entry: {e:?}");

@@ -1,14 +1,14 @@
 use sha3::{Digest, Sha3_256};
 
-#[derive(Debug)]
-pub struct Block {
+#[derive(Debug, PartialEq, Eq)]
+pub struct BlockInfo {
     offset: u64,
     block_size: u32,
     crc32: u32,
     sha3: [u8; 32],
 }
 
-impl Block {
+impl BlockInfo {
     pub fn new(offset: u64, buffer: &[u8]) -> Self {
         let block_size = buffer.len() as u32;
 

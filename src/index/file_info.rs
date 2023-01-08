@@ -1,4 +1,4 @@
-use super::block::Block;
+use super::block_info::BlockInfo;
 use color_eyre::eyre::{eyre, Result};
 use std::path::{Path, PathBuf};
 use tokio::{
@@ -8,12 +8,14 @@ use tokio::{
 use tracing::info;
 
 #[derive(Debug)]
-pub struct IndexEntry {
+pub struct FileInfo {
     path: PathBuf,
-    blocks: Vec<Block>,
+    size: u64,
+    block_size: u32,
+    blocks: Vec<BlockInfo>,
 }
 
-impl IndexEntry {
+impl FileInfo {
     pub async fn new<P>(file_path: P) -> Result<Self>
     where
         P: Into<PathBuf>,
@@ -78,7 +80,7 @@ impl IndexEntry {
 
             // Create block.
             let offset = file_size - total_bytes_to_read;
-            blocks.push(Block::new(offset, &buffer[..bytes_read]));
+            blocks.push(BlockInfo::new(offset, &buffer[..bytes_read]));
 
             // Decrement the number of bytes to read.
             total_bytes_to_read -= bytes_read as u64;
@@ -86,12 +88,26 @@ impl IndexEntry {
 
         // Return index.
         Ok(Self {
-            path: file_path.into(),
+            path: file_path,
+            size: file_size,
+            block_size,
             blocks,
         })
     }
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
+    pub fn block_size(&self) -> u32 {
+        self.block_size
+    }
+
+    pub fn blocks(&self) -> &[BlockInfo] {
+        &self.blocks
     }
 }
