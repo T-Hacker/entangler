@@ -1,14 +1,20 @@
 mod certificate;
 mod client;
+mod index;
 mod messages;
 mod server;
+
+use std::path::PathBuf;
 
 use certificate::generate_self_signed_cert;
 use clap::Parser;
 use client::connect;
 use color_eyre::eyre::Result;
 use server::listen;
-use tracing::*;
+
+const MAGIC_NUMBER: u32 = 0x17E434F;
+const NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
@@ -30,6 +36,9 @@ enum Command {
         /// Address to listen on.
         address: String,
 
+        /// Path to folder to syncronize.
+        source_path: PathBuf,
+
         /// Connection certificate.
         cert_filename: Option<String>,
 
@@ -41,6 +50,9 @@ enum Command {
     Connect {
         /// Server name. Must match the name on the certificate.
         server_name: String,
+
+        /// Path to folder to syncronize.
+        source_path: PathBuf,
 
         /// Client address.
         address: String,
@@ -71,13 +83,15 @@ async fn main() -> Result<()> {
             address,
             cert_filename,
             private_key_filename,
-        } => listen(&address, cert_filename, private_key_filename).await?,
+            source_path,
+        } => listen(&address, cert_filename, private_key_filename, source_path).await?,
 
         Command::Connect {
             server_name,
             address,
             cert_filename,
-        } => connect(&server_name, &address, cert_filename).await?,
+            source_path,
+        } => connect(&server_name, &address, cert_filename, source_path).await?,
     }
 
     Ok(())

@@ -1,7 +1,9 @@
 pub mod decoders;
 pub mod encoder;
+
 mod hello;
 
+// Exported types.
 pub use hello::HelloMessage;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -14,16 +16,17 @@ pub enum MessageType {
 #[cfg(test)]
 mod tests {
     use super::{decoders::HelloMessageDecoder, encoder::HelloMessageEncoder, hello::HelloMessage};
+    use crate::{MAGIC_NUMBER, NAME, VERSION};
     use bytes::BytesMut;
     use tokio_util::codec::{Decoder, Encoder};
 
     #[test]
     fn hello_message() {
         // Create message object.
-        let magic_number = 1234;
-        let name = "test_client";
-        let version = "0.1.0";
-        let message = HelloMessage::new(magic_number, name.to_string(), version.to_string());
+        let magic_number = MAGIC_NUMBER;
+        let name = NAME.to_string();
+        let version = VERSION.to_string();
+        let message = HelloMessage::new(magic_number, name, version);
 
         // Encode message object.
         let mut encoder = HelloMessageEncoder;

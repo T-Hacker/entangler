@@ -1,15 +1,13 @@
 use crate::{
-    certificate::{
-        certificate_filename_or_default, private_key_filename_or_default, read_certs_from_file,
-        read_private_key_from_file,
-    },
+    certificate::*,
+    index::IndexBuilder,
     messages::{decoders::HelloMessageDecoder, encoder::HelloMessageEncoder, HelloMessage},
-    server,
+    MAGIC_NUMBER, NAME, VERSION,
 };
 use color_eyre::eyre::{eyre, Result};
 use futures::{SinkExt, TryStreamExt};
 use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::*;
 
@@ -17,6 +15,7 @@ pub async fn listen(
     address: &str,
     cert_filename: Option<String>,
     private_key_filename: Option<String>,
+    source_path: PathBuf,
 ) -> Result<()> {
     // Create server connection configuration.
     let cert_filename = certificate_filename_or_default(cert_filename);
@@ -27,6 +26,14 @@ pub async fn listen(
 
     // Create the endpoint to start receiving connections.
     let endpoint = Endpoint::server(server_config, address.parse()?)?;
+
+    // Start indexing the source folder.
+    tokio::spawn(async move {
+        info!("Starting indexing folder: {source_path:?}");
+
+        let index = IndexBuilder::from_path(source_path).build().await;
+        dbg!(index);
+    });
 
     // Process incoming connections.
     info!("Waiting for connections...");
@@ -81,9 +88,15 @@ async fn handle_client(
 
     info!("Received hello message from client ({remote_address}): {hello_message:#?}");
 
+    // Check if version match.
+    let client_version = hello_message.version();
+    if client_version != VERSION {
+        warn!("Version mismatched between server ({VERSION}) and client ({client_version}).");
+    }
+
     // Respond to the client with an hello message.
     let mut framed = FramedWrite::new(send, HelloMessageEncoder);
-    let hello_message = HelloMessage::new(123, "server_test".to_string(), "0.0.1".to_string());
+    let hello_message = HelloMessage::new(MAGIC_NUMBER, NAME.to_string(), VERSION.to_string());
 
     info!("Send hello message to client ({remote_address}): {hello_message:#?}");
     framed.send(&hello_message).await?;

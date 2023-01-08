@@ -1,11 +1,13 @@
 use crate::{
     certificate::{certificate_filename_or_default, read_certs_from_file},
     messages::{decoders::HelloMessageDecoder, encoder::HelloMessageEncoder, HelloMessage},
+    MAGIC_NUMBER, NAME, VERSION,
 };
 use color_eyre::eyre::{eyre, Result};
 use futures::{SinkExt, TryStreamExt};
 use quinn::{ClientConfig, Endpoint};
 use rustls::RootCertStore;
+use std::path::PathBuf;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::*;
 
@@ -13,6 +15,7 @@ pub async fn connect(
     server_name: &str,
     address: &str,
     certificate_path: Option<String>,
+    source_path: PathBuf,
 ) -> Result<()> {
     // Create client connection configuration.
     let certificate_path = certificate_filename_or_default(certificate_path);
@@ -39,7 +42,7 @@ pub async fn connect(
     // Send the hello message.
     info!("Sending hello message...");
     let mut framed = FramedWrite::new(send, HelloMessageEncoder);
-    let hello_message = HelloMessage::new(123, "client_test".to_string(), "0.0.1".to_string());
+    let hello_message = HelloMessage::new(MAGIC_NUMBER, NAME.to_string(), VERSION.to_string());
     framed.send(&hello_message).await?;
 
     // Receive the hello message from the server.
@@ -50,6 +53,12 @@ pub async fn connect(
         .await?
         .ok_or_else(|| eyre!("Hello message not received."))?;
     info!("Received hello message from server: {hello_message:?}");
+
+    // Check if version match.
+    let server_version = hello_message.version();
+    if server_version != VERSION {
+        warn!("Version mismatched between server ({server_version}) and client ({VERSION}).");
+    }
 
     // Wait for server to clean up.
     endpoint.wait_idle().await;
