@@ -1,5 +1,6 @@
 use super::{BlockInfoEncoder, StringEncoder};
 use crate::index::FileInfo;
+use bytes::BufMut;
 use std::io::ErrorKind;
 use tokio_util::codec::Encoder;
 
@@ -18,6 +19,12 @@ impl Encoder<&FileInfo> for FileInfoEncoder {
             std::io::Error::new(ErrorKind::Other, "Fail to convert path to string: {path:?}")
         })?;
         string_encoder.encode(path, dst)?;
+
+        // Write file size.
+        dst.put_u64_le(item.size());
+
+        // Write block size.
+        dst.put_u32_le(item.block_size());
 
         // Reserve space for all blocks for performance reasons.
         let block_size_bytes = item.blocks().len() * item.block_size() as usize;

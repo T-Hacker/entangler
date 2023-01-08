@@ -1,13 +1,13 @@
 use super::block_info::BlockInfo;
 use color_eyre::eyre::{eyre, Result};
-use std::path::{Path, PathBuf};
-use tokio::{
+use std::{
     fs::File,
-    io::{AsyncReadExt, BufReader},
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
 };
-use tracing::info;
+use tracing::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct FileInfo {
     path: PathBuf,
     size: u64,
@@ -16,7 +16,16 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    pub async fn new<P>(file_path: P) -> Result<Self>
+    pub fn new(path: PathBuf, size: u64, block_size: u32, blocks: Vec<BlockInfo>) -> Self {
+        Self {
+            path,
+            size,
+            block_size,
+            blocks,
+        }
+    }
+
+    pub fn with_file_path<P>(file_path: P) -> Result<Self>
     where
         P: Into<PathBuf>,
     {
@@ -27,23 +36,8 @@ impl FileInfo {
         }
 
         // Calculate block size.
-        let file = loop {
-            match File::open(&file_path).await {
-                Ok(file) => break file,
-                Err(e) => {
-                    if let Some(error_code) = e.raw_os_error() {
-                        if error_code == 24 {
-                            tokio::task::yield_now().await;
-
-                            continue;
-                        }
-                    };
-
-                    return Err(eyre!("Fail to open file: {e:?}"));
-                }
-            }
-        };
-        let metadata = file.metadata().await?;
+        let file = File::open(&file_path)?;
+        let metadata = file.metadata()?;
         let file_size = metadata.len();
         let block_size: u32 = if file_size < 250 * 1024 * 1024 {
             128 * 1024
@@ -75,15 +69,14 @@ impl FileInfo {
             if bytes_to_read == 0 {
                 break;
             }
-            let bytes_read = file_buffer.read_exact(&mut buffer[..bytes_to_read]).await?;
-            info!("Path: {file_path:?} Bytes read: {bytes_read} Bytes to read: {bytes_to_read} File size: {file_size}");
+            file_buffer.read_exact(&mut buffer[..bytes_to_read])?;
 
             // Create block.
             let offset = file_size - total_bytes_to_read;
-            blocks.push(BlockInfo::new(offset, &buffer[..bytes_read]));
+            blocks.push(BlockInfo::new(offset, &buffer[..bytes_to_read]));
 
             // Decrement the number of bytes to read.
-            total_bytes_to_read -= bytes_read as u64;
+            total_bytes_to_read -= bytes_to_read as u64;
         }
 
         // Return index.

@@ -1,7 +1,7 @@
 use super::FileInfo;
 use std::{collections::HashMap, path::PathBuf};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct FolderIndex {
     entries: HashMap<PathBuf, FileInfo>,
 }

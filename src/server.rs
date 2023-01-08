@@ -1,6 +1,6 @@
 use crate::{
     certificate::*,
-    index::IndexBuilder,
+    index::FolderIndexBuilder,
     messages::{decoders::HelloMessageDecoder, encoder::HelloMessageEncoder, HelloMessage},
     MAGIC_NUMBER, NAME, VERSION,
 };
@@ -31,7 +31,7 @@ pub async fn listen(
     tokio::spawn(async move {
         info!("Starting indexing folder: {source_path:?}");
 
-        let index = IndexBuilder::from_path(source_path).build().await;
+        let index = FolderIndexBuilder::from_path(source_path).build().await;
         dbg!(index);
     });
 
