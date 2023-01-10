@@ -5,6 +5,7 @@ mod hello;
 mod string;
 
 pub use block_info::BlockInfoEncoder;
+pub use file_info::FileInfoEncoder;
 pub use folder_index::FolderIndexEncoder;
 pub use hello::HelloMessageEncoder;
 pub use string::StringEncoder;

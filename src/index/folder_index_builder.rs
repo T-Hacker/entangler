@@ -1,5 +1,4 @@
 use super::{FileInfo, FolderIndex};
-use futures::{stream::FuturesUnordered, StreamExt};
 use jwalk::rayon::prelude::*;
 use jwalk::WalkDir;
 use std::{collections::HashMap, path::PathBuf};

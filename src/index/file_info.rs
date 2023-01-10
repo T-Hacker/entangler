@@ -73,7 +73,7 @@ impl FileInfo {
 
             // Create block.
             let offset = file_size - total_bytes_to_read;
-            blocks.push(BlockInfo::new(offset, &buffer[..bytes_to_read]));
+            blocks.push(BlockInfo::with_buffer(offset, &buffer[..bytes_to_read]));
 
             // Decrement the number of bytes to read.
             total_bytes_to_read -= bytes_to_read as u64;

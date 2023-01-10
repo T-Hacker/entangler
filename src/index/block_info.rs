@@ -9,7 +9,16 @@ pub struct BlockInfo {
 }
 
 impl BlockInfo {
-    pub fn new(offset: u64, buffer: &[u8]) -> Self {
+    pub fn new(offset: u64, block_size: u32, crc32: u32, sha3: [u8; 32]) -> Self {
+        Self {
+            offset,
+            block_size,
+            crc32,
+            sha3,
+        }
+    }
+
+    pub fn with_buffer(offset: u64, buffer: &[u8]) -> Self {
         let block_size = buffer.len() as u32;
 
         // Calculate CRC32.

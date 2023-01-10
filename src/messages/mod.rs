@@ -15,9 +15,13 @@ pub enum MessageType {
 
 #[cfg(test)]
 mod tests {
-    use super::{decoders::HelloMessageDecoder, encoder::HelloMessageEncoder, hello::HelloMessage};
+    use super::{
+        decoders::{BlockInfoDecoder, FileInfoDecoder, HelloMessageDecoder, StringDecoder},
+        encoder::{BlockInfoEncoder, FileInfoEncoder, HelloMessageEncoder, StringEncoder},
+        hello::HelloMessage,
+    };
     use crate::{
-        index::FolderIndexBuilder,
+        index::{BlockInfo, FileInfo, FolderIndexBuilder},
         messages::{decoders::FolderIndexDecoder, encoder::FolderIndexEncoder},
         MAGIC_NUMBER, NAME, VERSION,
     };
@@ -48,12 +52,81 @@ mod tests {
         assert_eq!(decoded_message, message);
     }
 
+    #[test]
+    fn string() {
+        // Create string.
+        let string = "This is a string!".to_string();
+
+        // Encode string object.
+        let mut encoder = StringEncoder;
+        let mut buffer = BytesMut::new();
+        encoder.encode(&string, &mut buffer).unwrap();
+
+        // Decode string object.
+        let mut decoder = StringDecoder;
+        let decoded_string = decoder.decode(&mut buffer).unwrap().unwrap();
+
+        // Assert that we don't have more bytes in the buffer.
+        assert!(buffer.is_empty());
+
+        // Assert that both strings are equal.
+        assert_eq!(decoded_string, string);
+    }
+
+    #[test]
+    fn block_info() {
+        // Create block info object.
+        let block_info = BlockInfo::new(123, 333, 323, [3; 32]);
+
+        // Encode block info object.
+        let mut encoder = BlockInfoEncoder;
+        let mut buffer = BytesMut::new();
+        encoder.encode(&block_info, &mut buffer).unwrap();
+
+        // Decode block info object.
+        let mut decoder = BlockInfoDecoder;
+        let decoded_block_info = decoder.decode(&mut buffer).unwrap().unwrap();
+
+        // Assert that we don't have more bytes in the buffer.
+        assert!(buffer.is_empty());
+
+        // Assert that both objects are equal.
+        assert_eq!(decoded_block_info, block_info);
+    }
+
+    #[test]
+    fn file_info() {
+        // Create file info object.
+        let blocks = vec![
+            BlockInfo::new(123, 333, 323, [3; 32]),
+            BlockInfo::new(123, 333, 323, [3; 32]),
+            BlockInfo::new(123, 333, 323, [3; 32]),
+        ];
+        let file_info = FileInfo::new("/foo/bar".into(), 123, 333, blocks);
+
+        // Encode file info object.
+        let mut encoder = FileInfoEncoder;
+        let mut buffer = BytesMut::new();
+        encoder.encode(&file_info, &mut buffer).unwrap();
+
+        // Decode file info object.
+        let mut decoder = FileInfoDecoder;
+        let decoded_file_info = decoder.decode(&mut buffer).unwrap().unwrap();
+
+        // Assert that we don't have more bytes in the buffer.
+        assert!(buffer.is_empty());
+
+        // Assert that both objects are equal.
+        assert_eq!(decoded_file_info, file_info);
+    }
+
     #[tokio::test]
     async fn folder_index_builder() {
         tracing_subscriber::fmt().init();
 
         // Create folder index.
-        let folder_index = FolderIndexBuilder::from_path("~/Downloads/").build().await;
+        let folder_index = FolderIndexBuilder::from_path(".").build().await;
+        assert!(!folder_index.entries().is_empty());
 
         // Encode folder index.
         let mut encoder = FolderIndexEncoder;
