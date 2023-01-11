@@ -51,14 +51,14 @@ enum Command {
         /// Server name. Must match the name on the certificate.
         server_name: String,
 
-        /// Path to folder to syncronize.
-        source_path: PathBuf,
-
         /// Client address.
         address: String,
 
         /// Connection certificate.
         cert_filename: Option<String>,
+        ///
+        /// Path to folder to syncronize.
+        source_path: PathBuf,
     },
 }
 

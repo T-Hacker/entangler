@@ -36,7 +36,8 @@ impl Decoder for FileInfoDecoder {
         let block_size = src.get_u32_le();
 
         // Decode blocks.
-        let num_blocks = size as usize / block_size as usize + 1;
+        let num_blocks = size as usize / block_size as usize;
+
         let block_size_bytes = num_blocks * block_size as usize;
         src.reserve(block_size_bytes.saturating_sub(src.len()));
 

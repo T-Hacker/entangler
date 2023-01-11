@@ -102,7 +102,7 @@ mod tests {
             BlockInfo::new(123, 333, 323, [3; 32]),
             BlockInfo::new(123, 333, 323, [3; 32]),
         ];
-        let file_info = FileInfo::new("/foo/bar".into(), 123, 333, blocks);
+        let file_info = FileInfo::new("/foo/bar".into(), 333 * 3, 333, blocks);
 
         // Encode file info object.
         let mut encoder = FileInfoEncoder;
