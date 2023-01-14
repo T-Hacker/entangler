@@ -92,6 +92,12 @@ impl Decoder for HelloMessageDecoder {
         }
 
         let name_len = src.get_u8() as usize;
+        if src.len() < name_len {
+            src.reserve(name_len.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
         let name = src.split_to(name_len);
         let name = name.to_vec();
         let name = String::from_utf8(name).map_err(|e| {
@@ -109,6 +115,12 @@ impl Decoder for HelloMessageDecoder {
         }
 
         let version_len = src.get_u8() as usize;
+        if src.len() < version_len {
+            src.reserve(version_len.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
         let version = src.split_to(version_len);
         let version = version.to_vec();
         let version = String::from_utf8(version).map_err(|e| {
