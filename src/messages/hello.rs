@@ -1,9 +1,9 @@
-use super::MessageType;
+use bytes::{Buf, BufMut};
+use std::io::ErrorKind;
+use tokio_util::codec::{Decoder, Encoder};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct HelloMessage {
-    r#type: MessageType,
-
     magic_number: u32,
     name: String,
     version: String,
@@ -12,15 +12,10 @@ pub struct HelloMessage {
 impl HelloMessage {
     pub fn new(magic_number: u32, name: String, version: String) -> Self {
         Self {
-            r#type: MessageType::Hello,
             magic_number,
             name,
             version,
         }
-    }
-
-    pub fn r#type(&self) -> &MessageType {
-        &self.r#type
     }
 
     pub fn magic_number(&self) -> u32 {
@@ -33,5 +28,101 @@ impl HelloMessage {
 
     pub fn version(&self) -> &str {
         &self.version
+    }
+}
+
+pub struct HelloMessageEncoder;
+
+impl Encoder<&HelloMessage> for HelloMessageEncoder {
+    type Error = std::io::Error;
+
+    fn encode(
+        &mut self,
+        item: &HelloMessage,
+        dst: &mut bytes::BytesMut,
+    ) -> Result<(), Self::Error> {
+        // Write magic number.
+        dst.put_u32_le(item.magic_number);
+
+        // Write name.
+        if item.name.len() >= 255 {
+            return Err(std::io::Error::new(
+                ErrorKind::Other,
+                "Hello name is too large.",
+            ));
+        }
+        dst.put_u8(item.name.len() as u8);
+        dst.put(item.name.as_bytes());
+
+        // Write version.
+        if item.version.len() >= 255 {
+            return Err(std::io::Error::new(
+                ErrorKind::Other,
+                "Hello version is too large.",
+            ));
+        }
+        dst.put_u8(item.version.len() as u8);
+        dst.put(item.version.as_bytes());
+
+        Ok(())
+    }
+}
+
+pub struct HelloMessageDecoder;
+
+impl Decoder for HelloMessageDecoder {
+    type Item = HelloMessage;
+    type Error = std::io::Error;
+
+    fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        // Read magic number.
+        if src.len() < 4 {
+            src.reserve(4_usize.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
+        let magic_number = src.get_u32_le();
+
+        // Read name.
+        if src.len() < 1 {
+            src.reserve(1_usize.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
+        let name_len = src.get_u8() as usize;
+        let name = src.split_to(name_len);
+        let name = name.to_vec();
+        let name = String::from_utf8(name).map_err(|e| {
+            std::io::Error::new(
+                ErrorKind::Other,
+                format!("Unable to encode name string: {e:?}"),
+            )
+        })?;
+
+        // Read version.
+        if src.len() < 1 {
+            src.reserve(1_usize.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
+        let version_len = src.get_u8() as usize;
+        let version = src.split_to(version_len);
+        let version = version.to_vec();
+        let version = String::from_utf8(version).map_err(|e| {
+            std::io::Error::new(
+                ErrorKind::Other,
+                format!("Unable to encode version string: {e:?}"),
+            )
+        })?;
+
+        // Return object.
+        Ok(Some(HelloMessage {
+            magic_number,
+            name,
+            version,
+        }))
     }
 }

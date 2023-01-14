@@ -1,16 +1,14 @@
 mod certificate;
 mod client;
-mod index;
 mod messages;
 mod server;
-
-use std::path::PathBuf;
 
 use certificate::generate_self_signed_cert;
 use clap::Parser;
 use client::connect;
 use color_eyre::eyre::Result;
 use server::listen;
+use std::path::PathBuf;
 
 const MAGIC_NUMBER: u32 = 0x17E434F;
 const NAME: &str = env!("CARGO_PKG_NAME");

@@ -1,10 +1,6 @@
 use crate::{
     certificate::{certificate_filename_or_default, read_certs_from_file},
-    messages::{
-        decoders::{FolderIndexDecoder, HelloMessageDecoder},
-        encoder::HelloMessageEncoder,
-        HelloMessage,
-    },
+    messages::{HelloMessage, HelloMessageDecoder, HelloMessageEncoder},
     MAGIC_NUMBER, NAME, VERSION,
 };
 use color_eyre::eyre::{eyre, Result};
@@ -60,22 +56,6 @@ pub async fn connect(
         .await?
         .ok_or_else(|| eyre!("Hello message not received."))?;
     info!("Received hello message from server: {hello_message:?}");
-
-    // Receive folder index from the server.
-    info!("Receiving folder index...");
-    let recv = framed.into_inner();
-    let mut framed = FramedRead::new(recv, FolderIndexDecoder);
-    let folder_index = framed
-        .try_next()
-        .await?
-        .ok_or_else(|| eyre!("Folder index not received."))?;
-    dbg!(folder_index);
-
-    // Check if version match.
-    let server_version = hello_message.version();
-    if server_version != VERSION {
-        warn!("Version mismatched between server ({server_version}) and client ({VERSION}).");
-    }
 
     // Wait for server to clean up.
     endpoint.wait_idle().await;
