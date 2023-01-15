@@ -1,5 +1,6 @@
 mod certificate;
 mod client;
+mod file_scraper;
 mod folder_send;
 mod messages;
 mod server;

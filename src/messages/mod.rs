@@ -2,7 +2,8 @@ mod block_info;
 mod file_info;
 mod hello;
 
-pub use block_info::BlockInfo;
+pub use block_info::{BlockInfo, BlockInfoDecoder, BlockInfoEncoder};
+pub use file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder};
 pub use hello::{HelloMessage, HelloMessageDecoder, HelloMessageEncoder};
 
 #[cfg(test)]

@@ -30,16 +30,8 @@ pub async fn listen(
     // Create the endpoint to start receiving connections.
     let endpoint = Endpoint::server(server_config, address.parse()?)?;
 
-    // // Start indexing the source folder.
-    // {
-    //     let source_path = source_path.clone();
-    //
-    //     tokio::spawn(async move {
-    //         info!("Starting indexing folder: {source_path:?}");
-    //
-    //         todo!();
-    //     });
-    // }
+    // Start indexing files.
+    todo!();
 
     // Setup file watcher.
     let mut watcher = notify::recommended_watcher(|res| match res {
