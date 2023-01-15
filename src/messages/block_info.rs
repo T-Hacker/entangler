@@ -1,30 +1,45 @@
 use bytes::{Buf, BufMut};
-use std::{
-    io::ErrorKind,
-    path::{Path, PathBuf},
-};
+use md5::{Digest, Md5};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BlockInfo {
-    path: PathBuf,
+    file_id: u32,
     offset: u64,
     block_size: u32,
     hash: u128,
 }
 
 impl BlockInfo {
-    pub fn new(path: PathBuf, offset: u64, block_size: u32, hash: u128) -> Self {
+    pub fn new(file_id: u32, offset: u64, block_size: u32, hash: u128) -> Self {
         Self {
-            path,
+            file_id,
             offset,
             block_size,
             hash,
         }
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn from_buffer(buffer: &[u8], file_id: u32, offset: u64) -> Self {
+        // Calculate block hash.
+        let mut hasher = Md5::new();
+        hasher.update(buffer);
+
+        let hash = hasher.finalize();
+        let hash = &hash[..16];
+        let hash = u128::from_le_bytes(hash.try_into().unwrap());
+
+        // Return object.
+        Self {
+            file_id,
+            offset,
+            block_size: buffer.len() as u32,
+            hash,
+        }
+    }
+
+    pub fn file_id(&self) -> u32 {
+        self.file_id
     }
 
     pub fn offset(&self) -> u64 {
@@ -46,12 +61,8 @@ impl Encoder<&BlockInfo> for BlockInfoEncoder {
     type Error = std::io::Error;
 
     fn encode(&mut self, item: &BlockInfo, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        // Write path.
-        let path = item.path.to_str().ok_or_else(|| {
-            std::io::Error::new(ErrorKind::Other, "Fail to convert path to string.")
-        })?;
-        dst.put_u16_le(path.len() as u16);
-        dst.put(path.as_bytes());
+        // Write file identifier.
+        dst.put_u32_le(item.file_id);
 
         // Write offset.
         dst.put_u64_le(item.offset);
@@ -73,29 +84,14 @@ impl Decoder for BlockInfoDecoder {
     type Error = std::io::Error;
 
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Read path.
-        if src.len() < 2 {
-            src.reserve(2_usize.saturating_sub(src.len()));
+        // Read file identifier.
+        if src.len() < 4 {
+            src.reserve(4_usize.saturating_sub(src.len()));
 
             return Ok(None);
         }
 
-        let path_len = src.get_u16_le() as usize;
-        if src.len() < path_len {
-            src.reserve(path_len.saturating_sub(src.len()));
-
-            return Ok(None);
-        }
-
-        let path = src.split_to(path_len as usize);
-        let path = path.to_vec();
-        let path = String::from_utf8(path).map_err(|e| {
-            std::io::Error::new(
-                ErrorKind::Other,
-                format!("Unable to encode path string: {e:?}"),
-            )
-        })?;
-        let path = PathBuf::from(path);
+        let file_id = src.get_u32_le();
 
         // Read offset.
         if src.len() < 8 {
@@ -126,7 +122,7 @@ impl Decoder for BlockInfoDecoder {
 
         // Return object.
         Ok(Some(BlockInfo {
-            path,
+            file_id,
             offset,
             block_size,
             hash,

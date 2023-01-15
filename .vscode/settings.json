@@ -10,6 +10,7 @@
         "rcgen",
         "repr",
         "rustls",
-        "unsplit"
+        "unsplit",
+        "walkdir"
     ]
 }

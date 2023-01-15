@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn block_info() {
         // Create object.
-        let block_info = BlockInfo::new("/home/bob/foo/bar".into(), 123, 321, 121212);
+        let block_info = BlockInfo::new(1, 123, 321, 121212);
 
         // Encode object.
         let mut block_info_encoder = BlockInfoEncoder;

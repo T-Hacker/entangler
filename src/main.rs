@@ -1,7 +1,6 @@
 mod certificate;
 mod client;
 mod file_scraper;
-mod folder_send;
 mod messages;
 mod server;
 
@@ -36,7 +35,7 @@ enum Command {
         /// Address to listen on.
         address: String,
 
-        /// Path to folder to syncronize.
+        /// Path to folder to synchronize.
         source_path: PathBuf,
 
         /// Connection certificate.
@@ -57,7 +56,7 @@ enum Command {
         /// Connection certificate.
         cert_filename: Option<String>,
         ///
-        /// Path to folder to syncronize.
+        /// Path to folder to synchronize.
         source_path: PathBuf,
     },
 }

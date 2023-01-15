@@ -1,10 +1,8 @@
+use bytes::{Buf, BufMut};
 use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
-    str::FromStr,
 };
-
-use bytes::{Buf, BufMut};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, PartialEq, Eq)]
