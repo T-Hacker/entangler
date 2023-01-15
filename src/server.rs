@@ -1,5 +1,6 @@
 use crate::{
     certificate::*,
+    file_cache::FileCache,
     messages::{HelloMessage, HelloMessageDecoder, HelloMessageEncoder},
     MAGIC_NUMBER, NAME, VERSION,
 };
@@ -31,7 +32,7 @@ pub async fn listen(
     let endpoint = Endpoint::server(server_config, address.parse()?)?;
 
     // Start indexing files.
-    todo!();
+    let file_cache = FileCache::new(source_path.clone()).await;
 
     // Setup file watcher.
     let mut watcher = notify::recommended_watcher(|res| match res {

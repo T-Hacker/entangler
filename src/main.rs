@@ -1,7 +1,8 @@
 mod certificate;
 mod client;
-mod file_scraper;
+mod file_cache;
 mod messages;
+mod scraper;
 mod server;
 
 use certificate::generate_self_signed_cert;

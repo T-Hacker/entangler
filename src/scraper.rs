@@ -1,7 +1,7 @@
 use crate::messages::{BlockInfo, FileInfo};
 use std::{
     io::ErrorKind,
-    path::Path,
+    path::PathBuf,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -16,10 +16,12 @@ use tracing::*;
 use walkdir::WalkDir;
 
 pub async fn scrape(
-    path: impl AsRef<Path>,
+    path: PathBuf,
     file_info_tx: mpsc::Sender<Result<FileInfo, std::io::Error>>,
     block_info_tx: mpsc::Sender<Result<BlockInfo, std::io::Error>>,
 ) {
+    info!("Starting to scrape: {path:?}");
+
     let next_file_id = Arc::new(AtomicU32::new(0));
 
     for entry in WalkDir::new(path).into_iter() {
@@ -130,6 +132,4 @@ pub async fn scrape(
             }
         });
     }
-
-    todo!();
 }
