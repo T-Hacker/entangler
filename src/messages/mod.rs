@@ -1,6 +1,7 @@
 mod block_info;
 mod file_info;
 mod hello;
+mod watcher;
 
 pub use block_info::{BlockInfo, BlockInfoDecoder, BlockInfoEncoder};
 pub use file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder};
@@ -11,9 +12,14 @@ mod tests {
     use super::{
         block_info::{BlockInfoDecoder, BlockInfoEncoder},
         file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder},
+        watcher::{WatcherEventDecoder, WatcherEventEncoder},
         BlockInfo, HelloMessage, HelloMessageDecoder, HelloMessageEncoder,
     };
     use bytes::BytesMut;
+    use notify::{
+        event::{CreateKind, EventAttributes},
+        Event, EventKind,
+    };
     use tokio_util::codec::{Decoder, Encoder};
 
     #[test]
@@ -79,5 +85,32 @@ mod tests {
 
         // Make sure both objects are equal.
         assert_eq!(decoded_file_info, file_info);
+    }
+
+    #[test]
+    fn watcher() {
+        // Create object.
+        let kind = EventKind::Create(CreateKind::File);
+        let paths = vec!["/home/bob/foo/bar".into()];
+        let event = Event {
+            kind,
+            paths,
+            attrs: EventAttributes::new(),
+        };
+
+        // Encode object.
+        let mut watcher_event_encoder = WatcherEventEncoder;
+        let mut buffer = BytesMut::new();
+        watcher_event_encoder.encode(&event, &mut buffer).unwrap();
+
+        // Decode object.
+        let mut watcher_event_decoder = WatcherEventDecoder;
+        let decoded_event = watcher_event_decoder.decode(&mut buffer).unwrap().unwrap();
+
+        // Make sure that we don't have unused bytes on the buffer.
+        assert!(buffer.is_empty());
+
+        // Make sure both objects are equal.
+        assert_eq!(decoded_event, event);
     }
 }

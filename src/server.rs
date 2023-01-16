@@ -6,7 +6,10 @@ use crate::{
 };
 use color_eyre::eyre::{eyre, Result};
 use futures::{SinkExt, TryStreamExt};
-use notify::{RecursiveMode, Watcher};
+use notify::{
+    event::{DataChange, MetadataKind, ModifyKind, RenameMode},
+    EventKind, RecursiveMode, Watcher,
+};
 use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
 use std::{net::SocketAddr, path::PathBuf};
 use tokio_util::codec::{FramedRead, FramedWrite};
@@ -35,9 +38,41 @@ pub async fn listen(
     let file_cache = FileCache::new(source_path.clone()).await;
 
     // Setup file watcher.
-    let mut watcher = notify::recommended_watcher(|res| match res {
-        Ok(event) => info!("Watch event: {event:?}"),
-        Err(e) => error!("File watcher error: {e:?}"),
+    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, _>| {
+        dbg!(&res);
+
+        match res {
+            Ok(event) => match event.kind {
+                EventKind::Remove(_) => {
+                    let mut file_cache = file_cache.blocking_write();
+                    for path in &event.paths {
+                        file_cache.delete_file(path);
+                    }
+                }
+                EventKind::Modify(e) => match e {
+                    ModifyKind::Data(_) => {
+                        let mut file_cache = file_cache.blocking_write();
+                    }
+                    ModifyKind::Name(e) => match e {
+                        RenameMode::Both => {
+                            let from_path = event.paths.get(0).unwrap();
+                            let to_path = event.paths.get(1).unwrap();
+
+                            let mut file_cache = file_cache.blocking_write();
+                            file_cache.rename_file(from_path, to_path);
+                        }
+
+                        _ => warn!("Watch event not handled: {e:?}"),
+                    },
+
+                    _ => warn!("Watch event not handled: {e:?}"),
+                },
+
+                _ => warn!("Watch event not handled: {event:?}"),
+            },
+
+            Err(e) => error!("File watcher error: {e:?}"),
+        }
     })?;
     watcher.watch(&source_path, RecursiveMode::Recursive)?;
 

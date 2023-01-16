@@ -2,14 +2,18 @@ use crate::{
     messages::{BlockInfo, FileInfo},
     scraper::scrape,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 #[derive(Default)]
 pub struct FileCache {
-    file_info: Vec<FileInfo>,
-    block_info: Vec<BlockInfo>,
+    file_info: HashMap<PathBuf, FileInfo>,
+    block_info: HashMap<u32, Vec<BlockInfo>>,
 }
 
 impl FileCache {
@@ -31,6 +35,27 @@ impl FileCache {
         file_cache
     }
 
+    pub fn delete_file(&mut self, path: impl AsRef<Path>) {
+        // Remove file info.
+        let path = path.as_ref();
+        let Some(file_info) = self.file_info.remove(path) else {
+            error!("Fail to find file: {path:?}");
+
+            return;
+        };
+
+        // Remove block info.
+        let id = file_info.id();
+        self.block_info.remove(&id);
+    }
+
+    pub fn rename_file<P>(&mut self, from_path: P, to_path: P)
+    where
+        P: AsRef<Path>,
+    {
+        todo!();
+    }
+
     async fn cache_file_info(
         file_cache: Arc<RwLock<Self>>,
         mut file_info_rx: mpsc::Receiver<Result<FileInfo, std::io::Error>>,
@@ -39,15 +64,17 @@ impl FileCache {
             let file_info = match file_info {
                 Ok(file_info) => file_info,
                 Err(e) => {
-                    error!("Fail to retrive file infomation: {e:?}");
+                    error!("Fail to retrieve file information: {e:?}");
 
                     continue;
                 }
             };
-            info!("Caching file info: {file_info:?}");
+            trace!("Caching file info: {file_info:?}");
 
             let mut file_cache = file_cache.write().await;
-            file_cache.file_info.push(file_info);
+            file_cache
+                .file_info
+                .insert(file_info.path().to_owned(), file_info);
         }
     }
 
@@ -59,15 +86,20 @@ impl FileCache {
             let block_info = match block_info {
                 Ok(block_info) => block_info,
                 Err(e) => {
-                    error!("Fail to retrive block information: {e:?}");
+                    error!("Fail to retrieve block information: {e:?}");
 
                     continue;
                 }
             };
-            // info!("Caching block info: {block_info:?}");
+            trace!("Caching block info: {block_info:?}");
 
             let mut file_cache = file_cache.write().await;
-            file_cache.block_info.push(block_info);
+            let blocks = file_cache
+                .block_info
+                .entry(block_info.file_id())
+                .or_default();
+
+            blocks.push(block_info);
         }
     }
 }
