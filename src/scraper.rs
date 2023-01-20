@@ -81,7 +81,13 @@ pub async fn scrape(
         };
 
         let number_blocks = f32::ceil(size as f32 / block_size as f32) as u32;
-        let file_info = FileInfo::new(id, path.to_owned(), size, number_blocks);
+        let file_info = FileInfo::new(
+            id,
+            path.to_owned(),
+            size,
+            number_blocks,
+            metadata.modified().unwrap(),
+        );
 
         file_info_tx.blocking_send(Ok(file_info)).unwrap();
 

@@ -84,6 +84,7 @@ mod tests {
         event::{CreateKind, EventAttributes},
         Event, EventKind,
     };
+    use std::time::SystemTime;
     use tokio_util::codec::{Decoder, Encoder};
 
     #[test]
@@ -110,7 +111,7 @@ mod tests {
     #[test]
     fn file_info() {
         // Create object.
-        let file_info = FileInfo::new(123, "/home/bob/foo/bar".into(), 123, 321);
+        let file_info = FileInfo::new(123, "/home/bob/foo/bar".into(), 123, 321, SystemTime::now());
 
         // Encode object.
         let mut file_info_encoder = FileInfoEncoder;

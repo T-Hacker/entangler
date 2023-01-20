@@ -1,6 +1,7 @@
 mod certificate;
 mod client;
 mod file_cache;
+mod file_sync;
 mod messages;
 mod scraper;
 mod server;

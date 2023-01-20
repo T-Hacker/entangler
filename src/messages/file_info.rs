@@ -2,6 +2,7 @@ use bytes::{Buf, BufMut};
 use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
+    time::{Duration, SystemTime},
 };
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -11,15 +12,23 @@ pub struct FileInfo {
     path: PathBuf,
     size: u64,
     number_blocks: u32,
+    last_modified: SystemTime,
 }
 
 impl FileInfo {
-    pub fn new(id: u32, path: PathBuf, size: u64, number_blocks: u32) -> Self {
+    pub fn new(
+        id: u32,
+        path: PathBuf,
+        size: u64,
+        number_blocks: u32,
+        last_modified: SystemTime,
+    ) -> Self {
         Self {
             id,
             path,
             size,
             number_blocks,
+            last_modified,
         }
     }
 
@@ -37,6 +46,10 @@ impl FileInfo {
 
     pub fn number_blocks(&self) -> u32 {
         self.number_blocks
+    }
+
+    pub fn last_modified(&self) -> &SystemTime {
+        &self.last_modified
     }
 }
 
@@ -61,6 +74,14 @@ impl Encoder<&FileInfo> for FileInfoEncoder {
 
         // Write number of blocks.
         dst.put_u32_le(item.number_blocks);
+
+        // Write last modified date.
+        let last_modified = item
+            .last_modified
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        let last_modified = last_modified.as_nanos() as u64;
+        dst.put_u64_le(last_modified);
 
         Ok(())
     }
@@ -124,12 +145,24 @@ impl Decoder for FileInfoDecoder {
 
         let number_blocks = src.get_u32_le();
 
+        // Read last modified date.
+        if src.len() < 8 {
+            src.reserve(8_usize.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
+        let last_modified = src.get_u64_le();
+        let last_modified = Duration::from_nanos(last_modified);
+        let last_modified = SystemTime::UNIX_EPOCH.checked_add(last_modified).unwrap();
+
         // Return object.
         Ok(Some(FileInfo {
             id,
             path,
             size,
             number_blocks,
+            last_modified,
         }))
     }
 }
