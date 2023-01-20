@@ -1,11 +1,75 @@
 mod block_info;
 mod file_info;
-mod hello;
 mod watcher;
 
 pub use block_info::{BlockInfo, BlockInfoDecoder, BlockInfoEncoder};
 pub use file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder};
-pub use hello::{HelloMessage, HelloMessageDecoder, HelloMessageEncoder};
+
+use self::watcher::{WatcherEventDecoder, WatcherEventEncoder};
+use bytes::{Buf, BufMut};
+use std::io::ErrorKind;
+use tokio_util::codec::{Decoder, Encoder};
+
+#[derive(Debug)]
+pub enum Message {
+    WatcherEvent(notify::Event),
+}
+
+pub struct MessageEncoder;
+
+impl Encoder<&Message> for MessageEncoder {
+    type Error = std::io::Error;
+
+    fn encode(&mut self, item: &Message, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+        match item {
+            Message::WatcherEvent(event) => {
+                dst.put_u8(0);
+
+                let mut watcher_event_encoder = WatcherEventEncoder;
+                watcher_event_encoder.encode(event, dst)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub struct MessageDecoder;
+
+impl Decoder for MessageDecoder {
+    type Item = Message;
+    type Error = std::io::Error;
+
+    fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        // Read the message type.
+        if src.is_empty() {
+            src.reserve(1_usize.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
+        let message = src.get_u8();
+        let message = match message {
+            0 => {
+                let mut watcher_event_decoder = WatcherEventDecoder;
+                let Some(watcher_event) = watcher_event_decoder.decode(src)? else {
+                    return Ok(None);
+                };
+
+                Message::WatcherEvent(watcher_event)
+            }
+
+            _ => {
+                return Err(std::io::Error::new(
+                    ErrorKind::InvalidData,
+                    "Invalid message type deceived: {message}",
+                ))
+            }
+        };
+
+        Ok(Some(message))
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -13,7 +77,7 @@ mod tests {
         block_info::{BlockInfoDecoder, BlockInfoEncoder},
         file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder},
         watcher::{WatcherEventDecoder, WatcherEventEncoder},
-        BlockInfo, HelloMessage, HelloMessageDecoder, HelloMessageEncoder,
+        BlockInfo,
     };
     use bytes::BytesMut;
     use notify::{
@@ -21,29 +85,6 @@ mod tests {
         Event, EventKind,
     };
     use tokio_util::codec::{Decoder, Encoder};
-
-    #[test]
-    fn hello_message() {
-        // Create object.
-        let hello_message = HelloMessage::new(123, "test".to_string(), "0.1.0".to_string());
-
-        // Encode object.
-        let mut hello_message_encoder = HelloMessageEncoder;
-        let mut buffer = BytesMut::new();
-        hello_message_encoder
-            .encode(&hello_message, &mut buffer)
-            .unwrap();
-
-        // Decode object.
-        let mut hello_message_decoder = HelloMessageDecoder;
-        let decoded_hello_message = hello_message_decoder.decode(&mut buffer).unwrap().unwrap();
-
-        // Make sure that we don't have unused bytes on the buffer.
-        assert!(buffer.is_empty());
-
-        // Make sure both objects are equal.
-        assert_eq!(decoded_hello_message, hello_message);
-    }
 
     #[test]
     fn block_info() {

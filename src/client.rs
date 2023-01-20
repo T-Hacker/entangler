@@ -1,14 +1,15 @@
 use crate::{
     certificate::{certificate_filename_or_default, read_certs_from_file},
-    messages::{HelloMessage, HelloMessageDecoder, HelloMessageEncoder},
-    MAGIC_NUMBER, NAME, VERSION,
+    messages::{Message, MessageEncoder},
 };
-use color_eyre::eyre::{eyre, Result};
-use futures::{SinkExt, TryStreamExt};
+use color_eyre::eyre::Result;
+use futures::SinkExt;
+use notify::{RecursiveMode, Watcher};
 use quinn::{ClientConfig, Endpoint};
 use rustls::RootCertStore;
-use std::path::PathBuf;
-use tokio_util::codec::{FramedRead, FramedWrite};
+use std::{path::PathBuf, sync::Arc};
+use tokio::sync::mpsc;
+use tokio_util::codec::FramedWrite;
 use tracing::*;
 
 pub async fn connect(
@@ -33,29 +34,51 @@ pub async fn connect(
 
     // Bind the client socket to an address.
     let local_address = "0.0.0.0:0".parse()?;
-    let endpoint = Endpoint::client(local_address)?;
+    let endpoint = Arc::new(Endpoint::client(local_address)?);
 
-    // Connect to the server.
+    // Setup file watcher.
+    let (watcher_tx, mut watcher_rx) = mpsc::channel(16);
+    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, _>| {
+        dbg!(&res);
+        let event = match res {
+            Ok(event) => event,
+            Err(e) => {
+                error!("Watcher error: {e:?}");
+
+                return;
+            }
+        };
+
+        // Send event.
+        watcher_tx.blocking_send(event).unwrap();
+    })?;
+
+    watcher.watch(&source_path, RecursiveMode::Recursive)?;
+
+    //
     let remote_address = address.parse()?;
-    let connection = endpoint
-        .connect_with(client_config, remote_address, server_name)?
-        .await?;
-    let (send, recv) = connection.open_bi().await?;
+    while let Some(event) = watcher_rx.recv().await {
+        // Connect to the server.
+        let connection = endpoint
+            .connect_with(client_config.clone(), remote_address, &server_name)?
+            .await?;
+        let (send, _) = connection.open_bi().await?;
 
-    // Send the hello message.
-    info!("Sending hello message...");
-    let mut framed = FramedWrite::new(send, HelloMessageEncoder);
-    let hello_message = HelloMessage::new(MAGIC_NUMBER, NAME.to_string(), VERSION.to_string());
-    framed.send(&hello_message).await?;
+        // Wrap connection with codecs.
+        let mut write_framed = FramedWrite::new(send, MessageEncoder);
+        // let read_framed = FramedRead::new(recv, MessageDecoder);
 
-    // Receive the hello message from the server.
-    info!("Receiving hello message...");
-    let mut framed = FramedRead::new(recv, HelloMessageDecoder);
-    let hello_message = framed
-        .try_next()
-        .await?
-        .ok_or_else(|| eyre!("Hello message not received."))?;
-    info!("Received hello message from server: {hello_message:?}");
+        // Send event message.
+        write_framed
+            .send(&Message::WatcherEvent(event))
+            .await
+            .unwrap();
+
+        write_framed.close().await.unwrap();
+    }
+
+    // //
+    // tokio::signal::ctrl_c().await?;
 
     // Wait for server to clean up.
     endpoint.wait_idle().await;

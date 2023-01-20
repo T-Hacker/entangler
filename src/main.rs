@@ -12,10 +12,6 @@ use color_eyre::eyre::Result;
 use server::listen;
 use std::path::PathBuf;
 
-const MAGIC_NUMBER: u32 = 0x17E434F;
-const NAME: &str = env!("CARGO_PKG_NAME");
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
 enum Command {
@@ -54,18 +50,20 @@ enum Command {
         /// Client address.
         address: String,
 
-        /// Connection certificate.
-        cert_filename: Option<String>,
-        ///
         /// Path to folder to synchronize.
         source_path: PathBuf,
+
+        /// Connection certificate.
+        cert_filename: Option<String>,
     },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging.
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        // .with_max_level(LevelFilter::TRACE)
+        .init();
 
     // Initialize error report.
     color_eyre::install()?;

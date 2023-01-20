@@ -1,17 +1,13 @@
 use crate::{
     certificate::*,
     file_cache::FileCache,
-    messages::{HelloMessage, HelloMessageDecoder, HelloMessageEncoder},
-    MAGIC_NUMBER, NAME, VERSION,
+    messages::{Message, MessageDecoder, MessageEncoder},
 };
-use color_eyre::eyre::{eyre, Result};
-use futures::{SinkExt, TryStreamExt};
-use notify::{
-    event::{DataChange, MetadataKind, ModifyKind, RenameMode},
-    EventKind, RecursiveMode, Watcher,
-};
+use color_eyre::eyre::Result;
+use futures::TryStreamExt;
 use quinn::{Endpoint, RecvStream, SendStream, ServerConfig};
 use std::{net::SocketAddr, path::PathBuf};
+use tokio::sync::broadcast;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::*;
 
@@ -38,43 +34,22 @@ pub async fn listen(
     let file_cache = FileCache::new(source_path.clone()).await;
 
     // Setup file watcher.
+    let (watcher_tx, _) = broadcast::channel(16);
+    let watcher_tx_clone = watcher_tx.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, _>| {
         dbg!(&res);
+        let event = match res {
+            Ok(event) => event,
+            Err(e) => {
+                error!("Watcher error: {e:?}");
 
-        match res {
-            Ok(event) => match event.kind {
-                EventKind::Remove(_) => {
-                    let mut file_cache = file_cache.blocking_write();
-                    for path in &event.paths {
-                        file_cache.delete_file(path);
-                    }
-                }
-                EventKind::Modify(e) => match e {
-                    ModifyKind::Data(_) => {
-                        let mut file_cache = file_cache.blocking_write();
-                    }
-                    ModifyKind::Name(e) => match e {
-                        RenameMode::Both => {
-                            let from_path = event.paths.get(0).unwrap();
-                            let to_path = event.paths.get(1).unwrap();
+                return;
+            }
+        };
 
-                            let mut file_cache = file_cache.blocking_write();
-                            file_cache.rename_file(from_path, to_path);
-                        }
-
-                        _ => warn!("Watch event not handled: {e:?}"),
-                    },
-
-                    _ => warn!("Watch event not handled: {e:?}"),
-                },
-
-                _ => warn!("Watch event not handled: {event:?}"),
-            },
-
-            Err(e) => error!("File watcher error: {e:?}"),
-        }
+        watcher_tx_clone.send(event).unwrap_or_default();
     })?;
-    watcher.watch(&source_path, RecursiveMode::Recursive)?;
+    // watcher.watch(&source_path, RecursiveMode::Recursive)?;
 
     // Process incoming connections.
     info!("Waiting for connections...");
@@ -100,16 +75,19 @@ pub async fn listen(
         };
 
         // Create a task to handle client requests.
-        tokio::spawn(async move {
-            let remote_address = connection.remote_address();
+        {
+            let connection = connection.clone();
+            tokio::spawn(async move {
+                let remote_address = connection.remote_address();
 
-            match handle_client(remote_address, send, recv).await {
-                Ok(()) => info!("Client closed connection {}.", remote_address),
-                Err(e) => error!("Error handling client {}: {}", remote_address, e),
-            }
+                match handle_client(remote_address, send, recv).await {
+                    Ok(()) => info!("Client closed connection {}.", remote_address),
+                    Err(e) => error!("Error handling client {}: {}", remote_address, e),
+                }
+            });
+        }
 
-            connection.closed().await;
-        });
+        connection.closed().await;
     }
 
     Ok(())
@@ -120,27 +98,37 @@ async fn handle_client(
     send: SendStream,
     recv: RecvStream,
 ) -> Result<()> {
-    // Await the hello message.
-    let mut framed = FramedRead::new(recv, HelloMessageDecoder);
-    let hello_message = framed
-        .try_next()
-        .await?
-        .ok_or_else(|| eyre!("Didn't receive hello message from client: {remote_address}."))?;
+    let mut write_framed = FramedWrite::new(send, MessageEncoder);
+    let mut read_framed = FramedRead::new(recv, MessageDecoder);
 
-    info!("Received hello message from client ({remote_address}): {hello_message:#?}");
+    //
+    loop {
+        let Some(message) = read_framed.try_next().await? else {
+            break;
+        };
 
-    // Check if version match.
-    let client_version = hello_message.version();
-    if client_version != VERSION {
-        warn!("Version mismatched between server ({VERSION}) and client ({client_version}).");
+        tokio::spawn(async move {
+            match message {
+                Message::WatcherEvent(notify_event) => match notify_event.kind {
+                    // notify::EventKind::Modify(_) => todo!(),
+                    notify::EventKind::Remove(_) => {
+                        for path in &notify_event.paths {
+                            if path.is_dir() {
+                                if let Err(e) = tokio::fs::remove_dir_all(path).await {
+                                    error!("Fail to remove folder: {e:?}");
+                                }
+                            }
+                        }
+                    }
+
+                    _ => warn!("Not handling this watcher event: {notify_event:#?}"),
+                },
+            }
+        });
     }
 
-    // Respond to the client with an hello message.
-    let mut framed = FramedWrite::new(send, HelloMessageEncoder);
-    let hello_message = HelloMessage::new(MAGIC_NUMBER, NAME.to_string(), VERSION.to_string());
-
-    info!("Send hello message to client ({remote_address}): {hello_message:#?}");
-    framed.send(&hello_message).await?;
+    //
+    info!("Client ({remote_address}) disconnected successfully.");
 
     Ok(())
 }

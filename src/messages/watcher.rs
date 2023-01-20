@@ -1,5 +1,3 @@
-use std::{io::ErrorKind, path::PathBuf, sync::Arc};
-
 use bytes::{Buf, BufMut, BytesMut};
 use notify::{
     event::{
@@ -8,6 +6,7 @@ use notify::{
     },
     EventKind,
 };
+use std::{io::ErrorKind, path::PathBuf};
 use tokio_util::codec::{Decoder, Encoder};
 
 pub struct WatcherEventEncoder;

@@ -13,3 +13,4 @@ Cargo.lock
 cert
 private_key
 server_test_folder/
+client_test_folder/
