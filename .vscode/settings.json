@@ -4,6 +4,7 @@
     "cSpell.words": [
         "canonicalize",
         "hasher",
+        "pathdiff",
         "pemfile",
         "pkcs",
         "quic",

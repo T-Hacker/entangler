@@ -38,20 +38,36 @@ pub async fn connect(
 
     // Setup file watcher.
     let (watcher_tx, mut watcher_rx) = mpsc::channel(16);
-    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, _>| {
-        dbg!(&res);
-        let event = match res {
-            Ok(event) => event,
-            Err(e) => {
-                error!("Watcher error: {e:?}");
+    let mut watcher = {
+        let source_path = source_path.clone();
 
-                return;
-            }
-        };
+        notify::recommended_watcher(move |res: Result<notify::Event, _>| {
+            dbg!(&res);
+            let mut event = match res {
+                Ok(event) => match event.kind {
+                    notify::EventKind::Modify(_) | notify::EventKind::Remove(_) => event,
 
-        // Send event.
-        watcher_tx.blocking_send(event).unwrap();
-    })?;
+                    // Don't send other kinds of events to the server.
+                    _ => return,
+                },
+                Err(e) => {
+                    error!("Watcher error: {e:?}");
+
+                    return;
+                }
+            };
+
+            // Make paths relative to source path.
+            event.paths = event
+                .paths
+                .into_iter()
+                .map(|path| pathdiff::diff_paths(path, &source_path).unwrap())
+                .collect();
+
+            // Send event.
+            watcher_tx.blocking_send(event).unwrap();
+        })?
+    };
 
     watcher.watch(&source_path, RecursiveMode::Recursive)?;
 

@@ -84,10 +84,10 @@ pub async fn listen(
                     Ok(()) => info!("Client closed connection {}.", remote_address),
                     Err(e) => error!("Error handling client {}: {}", remote_address, e),
                 }
+
+                connection.closed().await;
             });
         }
-
-        connection.closed().await;
     }
 
     Ok(())
@@ -106,6 +106,7 @@ async fn handle_client(
         let Some(message) = read_framed.try_next().await? else {
             break;
         };
+        dbg!(&message);
 
         tokio::spawn(async move {
             match message {
@@ -126,9 +127,6 @@ async fn handle_client(
             }
         });
     }
-
-    //
-    info!("Client ({remote_address}) disconnected successfully.");
 
     Ok(())
 }

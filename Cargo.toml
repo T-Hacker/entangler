@@ -13,6 +13,7 @@ crc32fast = "1.3.2"
 futures = "0.3.25"
 md-5 = "0.10.5"
 notify = { version = "5.0.0", default-features = false, features = ["fsevent-sys", "macos_fsevent"] }
+pathdiff = "0.2.1"
 quinn = "0.9.3"
 rayon = "1.6.1"
 rcgen = "0.10.0"
