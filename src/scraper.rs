@@ -82,12 +82,13 @@ pub async fn scrape(
 
         let number_blocks = f32::ceil(size as f32 / block_size as f32) as u32;
         let file_info = FileInfo::new(
-            id,
             path.to_owned(),
             size,
             number_blocks,
+            block_size,
             metadata.modified().unwrap(),
         );
+        let path_id = file_info.calculate_hash_path();
 
         file_info_tx.blocking_send(Ok(file_info)).unwrap();
 
@@ -125,7 +126,7 @@ pub async fn scrape(
             }
 
             // Create block info object.
-            let block_info = BlockInfo::from_buffer(&buffer[0..bytes_read], id, offset);
+            let block_info = BlockInfo::from_buffer(&buffer[0..bytes_read], path_id, offset);
 
             // Send block info.
             block_info_tx.blocking_send(Ok(block_info)).unwrap();

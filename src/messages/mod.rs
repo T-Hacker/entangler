@@ -13,6 +13,8 @@ use tokio_util::codec::{Decoder, Encoder};
 #[derive(Debug)]
 pub enum Message {
     WatcherEvent(notify::Event),
+    FileInfo(FileInfo),
+    BlockInfo(BlockInfo),
 }
 
 pub struct MessageEncoder;
@@ -27,6 +29,18 @@ impl Encoder<&Message> for MessageEncoder {
 
                 let mut watcher_event_encoder = WatcherEventEncoder;
                 watcher_event_encoder.encode(event, dst)?;
+            }
+            Message::FileInfo(file_info) => {
+                dst.put_u8(1);
+
+                let mut file_info_encoder = FileInfoEncoder;
+                file_info_encoder.encode(file_info, dst)?;
+            }
+            Message::BlockInfo(block_info) => {
+                dst.put_u8(2);
+
+                let mut block_info_encoder = BlockInfoEncoder;
+                block_info_encoder.encode(block_info, dst)?;
             }
         }
 
@@ -57,6 +71,22 @@ impl Decoder for MessageDecoder {
                 };
 
                 Message::WatcherEvent(watcher_event)
+            }
+            1 => {
+                let mut file_info_decoder = FileInfoDecoder;
+                let Some(file_info) = file_info_decoder.decode(src)? else {
+                    return Ok(None);
+                };
+
+                Message::FileInfo(file_info)
+            }
+            2 => {
+                let mut block_info_decoder = BlockInfoDecoder;
+                let Some(block_info)=block_info_decoder.decode(src)? else {
+                    return Ok(None);
+                };
+
+                Message::BlockInfo(block_info)
             }
 
             _ => {
@@ -90,7 +120,7 @@ mod tests {
     #[test]
     fn block_info() {
         // Create object.
-        let block_info = BlockInfo::new(1, 123, 321, 121212);
+        let block_info = BlockInfo::new([3; 32], 123, 321, 121212);
 
         // Encode object.
         let mut block_info_encoder = BlockInfoEncoder;
@@ -111,7 +141,7 @@ mod tests {
     #[test]
     fn file_info() {
         // Create object.
-        let file_info = FileInfo::new(123, "/home/bob/foo/bar".into(), 123, 321, SystemTime::now());
+        let file_info = FileInfo::new("/home/bob/foo/bar".into(), 123, 321, 111, SystemTime::now());
 
         // Encode object.
         let mut file_info_encoder = FileInfoEncoder;

@@ -1,6 +1,6 @@
 use crate::{
     certificate::*,
-    file_cache::FileCache,
+    file_sync::handle_file_sync,
     messages::{Message, MessageDecoder, MessageEncoder},
 };
 use color_eyre::eyre::Result;
@@ -29,9 +29,6 @@ pub async fn listen(
 
     // Create the endpoint to start receiving connections.
     let endpoint = Endpoint::server(server_config, address.parse()?)?;
-
-    // Start indexing files.
-    let file_cache = FileCache::new(source_path.clone()).await;
 
     // Setup file watcher.
     let (watcher_tx, _) = broadcast::channel(16);
@@ -124,6 +121,14 @@ async fn handle_client(
 
                     _ => warn!("Not handling this watcher event: {notify_event:#?}"),
                 },
+                Message::FileInfo(file_info) => {
+                    if let Err(e) = handle_file_sync(&file_info).await {
+                        error!("Fail to handle file sync: {e:?}");
+                    }
+                }
+                Message::BlockInfo(block_info) => {
+                    todo!();
+                }
             }
         });
     }

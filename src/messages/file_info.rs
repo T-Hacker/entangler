@@ -1,4 +1,6 @@
 use bytes::{Buf, BufMut};
+use color_eyre::Result;
+use md5::Digest;
 use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
@@ -6,34 +8,66 @@ use std::{
 };
 use tokio_util::codec::{Decoder, Encoder};
 
-#[derive(Debug, PartialEq, Eq)]
+pub type PathId = [u8; 32];
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FileInfo {
-    id: u32,
     path: PathBuf,
     size: u64,
     number_blocks: u32,
+    block_size: u32,
     last_modified: SystemTime,
 }
 
 impl FileInfo {
     pub fn new(
-        id: u32,
         path: PathBuf,
         size: u64,
         number_blocks: u32,
+        block_size: u32,
         last_modified: SystemTime,
     ) -> Self {
         Self {
-            id,
             path,
             size,
             number_blocks,
+            block_size,
             last_modified,
         }
     }
 
-    pub fn id(&self) -> u32 {
-        self.id
+    pub fn with_file(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let metadata = path.metadata()?;
+        let size = metadata.len();
+        let last_modified = metadata.modified()?;
+        let block_size: u32 = if size < 250 * 1024 * 1024 {
+            128 * 1024
+        } else if size < 500 * 1024 * 1024 {
+            256 * 1024
+        } else if size < 1 * 1024 * 1024 * 1024 {
+            512 * 1024
+        } else if size < 2 * 1024 * 1024 * 1024 {
+            1 * 1024 * 1024
+        } else if size < 4 * 1024 * 1024 * 1024 {
+            2 * 1024 * 1024
+        } else if size < 8 * 1024 * 1024 * 1024 {
+            4 * 1024 * 1024
+        } else if size < 16 * 1024 * 1024 * 1024 {
+            8 * 1024 * 1024
+        } else {
+            16 * 1024 * 1024
+        };
+
+        let number_blocks = (size as f32 / block_size as f32).ceil() as u32;
+
+        Ok(FileInfo::new(
+            path.to_owned(),
+            size,
+            number_blocks,
+            block_size,
+            last_modified,
+        ))
     }
 
     pub fn path(&self) -> &Path {
@@ -48,8 +82,23 @@ impl FileInfo {
         self.number_blocks
     }
 
+    pub fn block_size(&self) -> u32 {
+        self.block_size
+    }
+
     pub fn last_modified(&self) -> &SystemTime {
         &self.last_modified
+    }
+
+    pub fn calculate_hash_path(&self) -> PathId {
+        let mut hasher = sha3::Sha3_256::new();
+
+        let path = self.path.to_str().unwrap();
+        hasher.update(path);
+
+        let path_id = hasher.finalize();
+
+        path_id.try_into().unwrap()
     }
 }
 
@@ -59,9 +108,6 @@ impl Encoder<&FileInfo> for FileInfoEncoder {
     type Error = std::io::Error;
 
     fn encode(&mut self, item: &FileInfo, dst: &mut bytes::BytesMut) -> Result<(), Self::Error> {
-        // Write file id.
-        dst.put_u32_le(item.id);
-
         // Write file path.
         let path = item.path.to_str().ok_or_else(|| {
             std::io::Error::new(ErrorKind::Other, "Fail to convert path to string.")
@@ -74,6 +120,9 @@ impl Encoder<&FileInfo> for FileInfoEncoder {
 
         // Write number of blocks.
         dst.put_u32_le(item.number_blocks);
+
+        // Write block size.
+        dst.put_u32_le(item.block_size);
 
         // Write last modified date.
         let last_modified = item
@@ -94,15 +143,6 @@ impl Decoder for FileInfoDecoder {
     type Error = std::io::Error;
 
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Read file id.
-        if src.len() < 4 {
-            src.reserve(4_usize.saturating_sub(src.len()));
-
-            return Ok(None);
-        }
-
-        let id = src.get_u32_le();
-
         // Read file path.
         if src.len() < 2 {
             src.reserve(2_usize.saturating_sub(src.len()));
@@ -145,6 +185,15 @@ impl Decoder for FileInfoDecoder {
 
         let number_blocks = src.get_u32_le();
 
+        // Read block size.
+        if src.len() < 4 {
+            src.reserve(4_usize.saturating_sub(src.len()));
+
+            return Ok(None);
+        }
+
+        let block_size = src.get_u32_le();
+
         // Read last modified date.
         if src.len() < 8 {
             src.reserve(8_usize.saturating_sub(src.len()));
@@ -158,10 +207,10 @@ impl Decoder for FileInfoDecoder {
 
         // Return object.
         Ok(Some(FileInfo {
-            id,
             path,
             size,
             number_blocks,
+            block_size,
             last_modified,
         }))
     }
