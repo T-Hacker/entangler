@@ -2,6 +2,7 @@ mod certificate;
 mod client;
 mod file_sync;
 mod messages;
+mod path_id_cache;
 mod scraper;
 mod server;
 

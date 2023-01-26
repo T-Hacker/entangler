@@ -1,8 +1,7 @@
-use std::io::ErrorKind;
-
-use super::file_info::PathId;
+use super::PathId;
 use bytes::{Buf, BufMut};
 use md5::{Digest, Md5};
+use std::io::ErrorKind;
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, PartialEq, Eq)]

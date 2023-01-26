@@ -1,6 +1,6 @@
 use crate::{
     certificate::*,
-    file_sync::handle_file_sync,
+    file_sync::{handle_file_sync, start_file_sync},
     messages::{Message, MessageDecoder, MessageEncoder},
 };
 use color_eyre::eyre::Result;
@@ -105,32 +105,42 @@ async fn handle_client(
         };
         dbg!(&message);
 
-        tokio::spawn(async move {
-            match message {
-                Message::WatcherEvent(notify_event) => match notify_event.kind {
-                    // notify::EventKind::Modify(_) => todo!(),
-                    notify::EventKind::Remove(_) => {
-                        for path in &notify_event.paths {
-                            if path.is_dir() {
-                                if let Err(e) = tokio::fs::remove_dir_all(path).await {
-                                    error!("Fail to remove folder: {e:?}");
-                                }
+        match message {
+            Message::WatcherEvent(notify_event) => match notify_event.kind {
+                notify::EventKind::Modify(_) => {
+                    for path in &notify_event.paths {
+                        if let Err(e) =
+                            start_file_sync(path, &mut write_framed, &mut read_framed).await
+                        {
+                            error!("Fail to sync file {path:?}: {e:?}");
+                        }
+                    }
+                }
+                notify::EventKind::Remove(_) => {
+                    for path in &notify_event.paths {
+                        if path.is_dir() {
+                            if let Err(e) = tokio::fs::remove_dir_all(path).await {
+                                error!("Fail to remove folder {path:?}: {e:?}");
+                            }
+                        } else {
+                            if let Err(e) = tokio::fs::remove_file(path).await {
+                                error!("Fail to remove file {path:?}: {e:?}");
                             }
                         }
                     }
-
-                    _ => warn!("Not handling this watcher event: {notify_event:#?}"),
-                },
-                Message::FileInfo(file_info) => {
-                    if let Err(e) = handle_file_sync(&file_info).await {
-                        error!("Fail to handle file sync: {e:?}");
-                    }
                 }
-                Message::BlockInfo(block_info) => {
-                    todo!();
+
+                _ => warn!("Not handling this watcher event: {notify_event:#?}"),
+            },
+            Message::FileInfo(file_info) => {
+                if let Err(e) = handle_file_sync(&file_info).await {
+                    error!("Fail to handle file sync: {e:?}");
                 }
             }
-        });
+            Message::BlockInfo(block_info) => {
+                todo!();
+            }
+        }
     }
 
     Ok(())

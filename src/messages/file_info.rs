@@ -89,17 +89,6 @@ impl FileInfo {
     pub fn last_modified(&self) -> &SystemTime {
         &self.last_modified
     }
-
-    pub fn calculate_hash_path(&self) -> PathId {
-        let mut hasher = sha3::Sha3_256::new();
-
-        let path = self.path.to_str().unwrap();
-        hasher.update(path);
-
-        let path_id = hasher.finalize();
-
-        path_id.try_into().unwrap()
-    }
 }
 
 pub struct FileInfoEncoder;

@@ -3,7 +3,7 @@ mod file_info;
 mod watcher;
 
 pub use block_info::{BlockInfo, BlockInfoDecoder, BlockInfoEncoder};
-pub use file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder};
+pub use file_info::{FileInfo, FileInfoDecoder, FileInfoEncoder, PathId};
 
 use self::watcher::{WatcherEventDecoder, WatcherEventEncoder};
 use bytes::{Buf, BufMut};

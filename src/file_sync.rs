@@ -1,4 +1,7 @@
-use crate::messages::{BlockInfo, FileInfo, Message, MessageDecoder, MessageEncoder};
+use crate::{
+    messages::{BlockInfo, FileInfo, Message, MessageDecoder, MessageEncoder},
+    path_id_cache::PathIdCache,
+};
 use color_eyre::{eyre::eyre, Result};
 use futures::{SinkExt, TryStreamExt};
 use quinn::{RecvStream, SendStream};
@@ -55,7 +58,7 @@ async fn send_file_blocks(
     let mut file = BufReader::with_capacity(block_size, file);
 
     // Send block info.
-    let path_id = file_info.calculate_hash_path();
+    let path_id = PathIdCache::calculate_path_id(file_info.path());
     let mut buffer = vec![0u8; block_size as usize];
     let mut offset = 0;
     loop {
@@ -70,7 +73,7 @@ async fn send_file_blocks(
         let block_info = BlockInfo::from_buffer(&buffer[0..bytes_read], path_id, offset);
 
         // Send block info.
-        write_framed.send(&Message::BlockInfo(block_info));
+        write_framed.send(&Message::BlockInfo(block_info)).await?;
 
         // Incremente offset by bytes read.
         offset += bytes_read as u64;

@@ -1,4 +1,7 @@
-use crate::messages::{BlockInfo, FileInfo};
+use crate::{
+    messages::{BlockInfo, FileInfo},
+    path_id_cache::PathIdCache,
+};
 use rayon::prelude::*;
 use std::{
     fs::File,
@@ -88,7 +91,7 @@ pub async fn scrape(
             block_size,
             metadata.modified().unwrap(),
         );
-        let path_id = file_info.calculate_hash_path();
+        let path_id = PathIdCache::calculate_path_id(file_info.path());
 
         file_info_tx.blocking_send(Ok(file_info)).unwrap();
 
